@@ -55,6 +55,8 @@ address_arr:   .space  24 # an array that store the pixel address of all the obj
 # 3rd is the address of the 2nd platform, 4th is the address of the 3rd platform
 # 5th is the address of the health, 6th is the address of the bomb
 platform_type1:   .space  12 # store the width, height and the first pixel of platform type 1
+platform_type2:   .space  12 # store the width, height and the first pixel of platform type 2
+platform_type3:   .space  12 # store the width, height and the first pixel of platform type 3
 health:           .space  12 # store the width, height and the first pixel of health
 bomb:             .space  12 # store the width, height and the first pixel of bomb
 character:        .space  12 # store the width, height and the first pixel of character
@@ -63,16 +65,11 @@ character:        .space  12 # store the width, height and the first pixel of ch
 .globl main
  
 main: 
-      # initialize the screen with all the characters
+      # initialize the screen with all the objects
       la $s1, address_arr # $s1 is the base address of address_arr
-      # clear the screen
-      #li $t0, HEIGHT
-      #div $t0, $t0, SINGLE_P
-      #move $fp, $sp # set the 
-      #li $t0, 
       # creat a character 
       li $t0, BASE_ADDRESS
-      li $t1, 7 # set the width 
+      li $t1, 20 # set the width 
       li $t2, 9 # set the height 
       li $t3, 1 # set the starting height
       mul $t3, $t3, WIDTH
@@ -82,46 +79,197 @@ main:
       sw $t1, 0($t4) # save the width 
       sw $t2, 4($t4) # save the height
       sw $t0, 8($t4) # save the first pixel
-      sw $t4, ($s1) # save the address into the array
-      li $a0, 0 # pass in the offset
       jal CREAT_CHARACTER
+      # creat a platform1 
+      li $t0, BASE_ADDRESS
+      li $t1, 35 # set the width 
+      li $t2, 2 # set the height 
+      li $t3, 30 # set the starting height
+      mul $t3, $t3, WIDTH
+      add $t0, $t0, $t3 # set the starting pixel 
+      la $t4, platform_type1 # $t4 is the address 
+      sw $t1, 0($t4) # save the width 
+      sw $t2, 4($t4) # save the height
+      sw $t0, 8($t4) # save the first pixel
+      li $a0, 1
+      jal CREAT_PLATFORM
+      # creat a platform2 
+      li $t0, BASE_ADDRESS
+      li $t1, 25 # set the width 
+      li $t2, 2 # set the height 
+      li $t3, 24 # set the starting height
+      mul $t3, $t3, WIDTH
+      add $t0, $t0, $t3
+      addi $t0, $t0, 200 # set the starting pixel 
+      la $t4, platform_type2 # $t4 is the address 
+      sw $t1, 0($t4) # save the width 
+      sw $t2, 4($t4) # save the height
+      sw $t0, 8($t4) # save the first pixel
+      li $a0, 2
+      jal CREAT_PLATFORM
+      # creat a platform3
+      li $t0, BASE_ADDRESS
+      li $t1, 30 # set the width 
+      li $t2, 2 # set the height 
+      li $t3, 40 # set the starting height
+      mul $t3, $t3, WIDTH
+      add $t0, $t0, $t3
+      addi $t0, $t0, 340 # set the starting pixel 
+      la $t4, platform_type3 # $t4 is the address 
+      sw $t1, 0($t4) # save the width 
+      sw $t2, 4($t4) # save the height
+      sw $t0, 8($t4) # save the first pixel
+      li $a0, 3
+      jal CREAT_PLATFORM
+main_loop:
       # read the input from the keyboard
       li $t9, 0xffff0000
       lw $t8, 0($t9)
       beq $t8, 1, keypress_happened
+      la $t0, character
+      lw $t1, 8($t0)
+      # check collision
+      move $t2, $t1
+      li $t3, 20
+      li $t5, 9
+      mul $t5, $t5, WIDTH
+      add $t2, $t2, $t5
+loop_main_s:
+      lw $t4, ($t2)
+      bne $t4, BLACK, main_cont
+      addi $t2, $t2, SINGLE_P
+      subi $t3, $t3, 1
+      bnez $t3, loop_main_s
+      addi $t1, $t1, WIDTH
+      sw $t1, 8($t0)
+      # remove the character
+      lw $t4, ($t0)
+      move $a0, $t4
+      lw $t3, 4($t0)
+      move $a1, $t3
+      subi $t1, $t1, WIDTH
+      move $a2, $t1
+      jal REMOVE
+      jal CREAT_CHARACTER
+main_cont:
       # sleep
       li $v0, 32
-      li $a0, 1000
+      li $a0, 200
       syscall
+      j main_loop
             
       li $v0, 10
       syscall
 keypress_happened:
       lw $t2, 4($t9)
+      subi $sp, $sp, 4 # save the instruction
+      sw $t2, ($sp)
+      la $t0, character # load the address of the character
+      lw $t1, 8($t0) # load the starting pixel
+      # remove the character
+      lw $t4, ($t0)
+      move $a0, $t4
+      lw $t3, 4($t0)
+      move $a1, $t3
+      move $a2, $t1
+      jal REMOVE
+      la $t0, character
+      lw $t1, 8($t0) # load the starting pixel
+      lw $t2, ($sp) # restore the instruction
+      addi $sp, $sp, 4
       beq $t2, 0x61, respond_to_a
       beq $t2, 0x64, respond_to_d
       beq $t2, 0x77, respond_to_w
       beq $t2, 0x73, respond_to_s
+back:
+      sw $t1, 8($t0) # update it in the array
+      # update the character  
+      jal CREAT_CHARACTER
+      j main_cont
 respond_to_a:
-      lw $t0, ($s1) # load the address of the character
-      lw $t1, 8($t0) # load the starting pixel
+      # check board
+      move $t2, $t1
+      subi $t2, $t2, BASE_ADDRESS
+      li $t3, WIDTH
+      div $t2, $t3
+      mfhi $t2
+      beqz $t2, back
+      # check collision
+      move $t2, $t1
+      li $t3, 9
+      subi $t2, $t2, 4
+loop_a:
+      lw $t4, ($t2)
+      bne $t4, BLACK, back
+      addi $t2, $t2, WIDTH
+      subi $t3, $t3, 1
+      bnez $t3, loop_a
+      # move
       subi $t1, $t1, 4 # move left one pixel
-      sw $t1, 8($t0) # update it in the array
+      j back
 respond_to_d:
-      lw $t0, ($s1) # load the address of the character
-      lw $t1, 8($t0) # load the starting pixel
+      # check board
+      move $t2, $t1
+      subi $t2, $t2, BASE_ADDRESS
+      subi $t2, $t2, 432
+      li $t3, WIDTH
+      div $t2, $t3
+      mfhi $t2
+      beqz $t2, back
+      # check collision
+      move $t2, $t1
+      li $t3, 9
+      addi $t2, $t2, 80
+loop_d:
+      lw $t4, ($t2)
+      bne $t4, BLACK, back
+      addi $t2, $t2, WIDTH
+      subi $t3, $t3, 1
+      bnez $t3, loop_d
+      # move
       addi $t1, $t1, 4 # move right one pixel
-      sw $t1, 8($t0) # update it in the array
+      j back
 respond_to_w:
-      lw $t0, ($s1) # load the address of the character
-      lw $t1, 8($t0) # load the starting pixel
+      # check board
+      move $t2, $t1
+      subi $t2, $t2, BASE_ADDRESS
+      ble $t2, 428, back
+      # check collision
+      move $t2, $t1
+      li $t3, 20
+      subi $t2, $t2, WIDTH
+loop_w:
+      lw $t4, ($t2)
+      bne $t4, BLACK, back
+      addi $t2, $t2, SINGLE_P
+      subi $t3, $t3, 1
+      bnez $t3, loop_w
+      # move
       subi $t1, $t1, WIDTH # move up one pixel
-      sw $t1, 8($t0) # update it in the array
+      j back
 respond_to_s:
-      lw $t0, ($s1) # load the address of the character
-      lw $t1, 8($t0) # load the starting pixel
+      # check board
+      move $t2, $t1
+      li $t3, WIDTH
+      mul $t3, $t3, 55
+      addi $t3, $t3, BASE_ADDRESS
+      sub $t2, $t2, $t3
+      bgez $t2, back
+      # check collision
+      move $t2, $t1
+      li $t3, 20
+      li $t5, 9
+      mul $t5, $t5, WIDTH
+      add $t2, $t2, $t5
+loop_s:
+      lw $t4, ($t2)
+      bne $t4, BLACK, back
+      addi $t2, $t2, SINGLE_P
+      subi $t3, $t3, 1
+      bnez $t3, loop_s
+      # move
       addi $t1, $t1, WIDTH # move down one pixel
-      sw $t1, 8($t0) # update it in the array
+      j back
 
       
 CREAT_PLATFORM:
@@ -130,9 +278,20 @@ CREAT_PLATFORM:
       subi $sp, $sp, 4 # save the old fp
       sw $fp, ($sp)
       move $fp, $sp # set the new fp
-      move $t1, $a0 # $t1 will be the offset
-      add $t2, $s1, $t1 # $t2 is the address in the array
-      lw $t2, ($t2) 
+      move $t6, $a0
+      beq $t6, 1, type1
+      beq $t6, 2, type2
+      beq $t6, 3, type3
+type1:
+      la $t2, platform_type1 # get the address
+      j plat_cont
+type2:
+      la $t2, platform_type2 # get the address
+      j plat_cont
+type3:
+      la $t2, platform_type3 # get the address
+      j plat_cont
+plat_cont:
       lw $t4, 0($t2) # load the width
       subi $sp, $sp, 4 # save the width
       sw $t4, ($sp)
@@ -168,9 +327,7 @@ PLAT_LOOP:
 CREAT_HEALTH:
       subi $sp, $sp 4 # save the return address
       sw $ra, ($sp) 
-      move $t1, $a0 # t1 is the offset
-      add $t2, $s1, $t1 # go to the platform need to be paint
-      lw $t2, ($t2) # load the address
+      la $t2, health # load the address
       lw $t3, 8($t2) # load the starting pixel
       li $t1, 2 # draw the first orange part in the 1st row
       li $t0, ORANGE
@@ -290,9 +447,7 @@ CREAT_HEALTH:
 CREAT_BOMB:
       subi $sp, $sp 4 # save the return address
       sw $ra, ($sp) 
-      move $t1, $a0 # t1 is the offset
-      add $t2, $s1, $t1 # go to the platform need to be paint
-      lw $t2, ($t2) # load the address
+      la $t2, bomb # load the address
       lw $t3, 8($t2) # load the starting pixel
       li $t4, 3
       mul $t4, $t4, SINGLE_P
@@ -400,9 +555,7 @@ CREAT_BOMB:
 CREAT_CHARACTER:
       subi $sp, $sp 4 # save the return address
       sw $ra, ($sp) 
-      move $t1, $a0 # t1 is the offset
-      add $t2, $s1, $t1 # go to the platform need to be paint
-      lw $t2, ($t2) # load the address
+      la $t2, character
       lw $t3, 8($t2) # load the starting pixel
       li $t4, 4
       mul $t4, $t4, SINGLE_P
@@ -801,26 +954,60 @@ LOOP_PAINT:
       jr $ra
       
 REMOVE:
-      li $t0, BLACK
-      lw $t1, ($sp) # pop off the width
-      addi $sp, $sp, 4
-      lw $t2, ($sp) # pop off the height
-      addi $sp, $sp, 4
-LOOP_REMOVE:
-      subi $sp, $sp, 4
+      subi $sp, $sp, 4 # push the return address
+      sw $ra, ($sp)
+      move $t1, $a0 # pop off the width
+      subi $sp, $sp, 4 # push the width
       sw $t1, ($sp)
-      subi $sp, $sp, 4
-      sw $t0, ($sp)
+      move $t2, $a1 # pop off the height
+      subi $sp, $sp, 4 # save the height
+      sw $t2, ($sp)
+      move $t3, $a2 # pop off the starting pixel
+LOOP_REMOVE:
+      li $t0, BLACK
+      lw $t1, 4($sp)
+      move $a0, $t1 # push the width
+      move $a1, $t0 # push the colour
+      move $a2, $t3 # push the starting pixel
       jal PAINT
+      move $t3, $v0 # get the return address
+      lw $t1, 4($sp) # get the width
+      li $t2, WIDTH
+      mul $t1, $t1, SINGLE_P
+      sub $t2, $t2, $t1
+      add $t3, $t3, $t2 # go to the next row
+      lw $t2, ($sp) # get the height
       subi $t2, $t2, 1
-      li $t3, WIDTH
-      mul $t4, $t1, SINGLE_P
-      #subi $t4, $t4, SINGLE_P
-      sub $t3, $t3, $t4
-      add $s1, $s1, $t3
+      sw $t2, ($sp) # update the height
       bnez $t2, LOOP_REMOVE
       
-      move $ra, $s0
+      lw $ra, 8($sp) # restore ra
+      addi $sp, $sp, 12
+      jr $ra
+      
+CLEAR_SCREEN:
+      subi $sp, $sp, 4 # push the return address
+      sw $ra, ($sp)
+      li $t0, 0
+      subi $sp, $sp, 4 # push the height
+      sw $t0, ($sp)
+CLEAR_LOOP:
+      li $t1, BLACK
+      li $a0, 128 # pass in the number of pixel
+      move $a1, $t1 # pass in the color
+      li $t2, BASE_ADDRESS
+      li $t3, WIDTH
+      mul $t3, $t3, $t0
+      add $t2, $t2, $t3
+      move $a2, $t2 # pass in the starting pixel
+      jal PAINT
+      lw $t0, ($sp)
+      addi $t0, $t0, 1
+      sw $t0, ($sp)
+      bne $t0, 64, CLEAR_LOOP
+      
+      lw $ra, 4($sp) # restore ra
+      addi $sp, $sp, 8
       jr $ra
       
       
