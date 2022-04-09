@@ -32,9 +32,11 @@
 # 
 # Link to video demonstration for final submission: 
 # - (insert YouTube / MyMedia / other URL here). Make sure we can view it! 
-# 
+# https://play.library.utoronto.ca/watch/59dd6de2a2523cc0275c866d7f86ce69
+#
 # Are you OK with us sharing the video with people outside course staff? 
 # - yes / no / yes, and please share this project github link as well! 
+# yes, https://github.com/JohnY2002/Assambly-Project
 # 
 # Any additional information that the TA needs to know: 
 # - (write here, if any) 
